@@ -3,10 +3,10 @@
 //! ([`Scene`]) and a small CPU rasterizer (z-buffer, shaded triangles, depth-tested lines) for
 //! pictures without a GPU. Picking drawn lines: the drawn point nearest the pointer
 //! ([`nearest_drawn_point`]). The opaque and clear-coat shading models and the section hatch. The
-//! grid's spacing and reach for a view ([`grid`]). It
-//! draws solidcore-tess's display meshes and knows no app's geometry crate, GPU API or UI
-//! toolkit: the GPU pipelines are `solidcraft-viewport-gpu`, the egui glue
-//! `solidcraft-viewport-egui`.
+//! infinite reference grid ([`grid`]: spacing levels, cross-fade, distance fade and world
+//! segments). It draws solidcore-tess's display meshes and solidcore-record's vectors ([`Vec2`],
+//! [`Vec3`]), and knows no app's geometry crate, GPU API or UI toolkit: the GPU pipelines are
+//! `solidcraft-viewport-gpu`, the egui glue `solidcraft-viewport-egui`.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 #![forbid(unsafe_code)]
 
@@ -55,4 +55,5 @@ pub use scene::section_hatch;
 pub use scene::section_hatch_line;
 pub use scene::section_hatch_of;
 pub use scene::section_plane_frame;
+pub use solidcore_record::{Vec2, Vec3};
 pub use view_spec::ViewSpec;

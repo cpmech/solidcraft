@@ -7,8 +7,9 @@ use serde_json::json;
 use solidcore_record::{Plane, Vec2, Vec3};
 use solidcraft_engine::geom::prelude::*;
 use solidcraft_engine::sketch::CurveKind;
-use solidcraft_engine::view::{GridFade, GridPlane, colors, grid_ext, grid_lines, grid_plane, grid_step, sketch_lines_with_sampler};
+use solidcraft_engine::view::{GridFade, GridPlane, colors, grid_ext, grid_plane, grid_step, sketch_lines_with_sampler};
 use solidcraft_engine::{SectionPlane, Sel};
+use solidcraft_viewport::grid::{GridFrame, grid_centre, grid_segments_on};
 use solidcraft_viewport::{Camera, Mat4, Rgb};
 use std::hash::{Hash, Hasher};
 
@@ -3415,20 +3416,14 @@ pub(crate) fn build_sketch_scene(app: &SolveApp, proj: &Proj) -> GpuScene {
         // line on its own place on the plane: the grid's centre on each axis, from the plane's
         // origin (the sketch plane's, or the camera frame's).
         let origin = sketch_plane.as_ref().map_or(Vec3::ZERO, |pl| pl.origin);
-        let (at_u, at_v) = ((c - origin).dot(u), (c - origin).dot(v));
-        // Two lines through the point `c + u * t`: one along v, one along u.
-        for (along, across, at) in [(v, u, at_u), (u, v, at_v)] {
-            for line in grid_lines(app.cam.half_height(), at, fade.end, 300) {
-                let t = line.offset;
-                // A line two levels share with different kinds blends between the minor and
-                // the major look.
-                let col = grid_blend(grid, grid_major, line.major);
-                let wd = 0.7 + 0.3 * line.major;
-                for (s0, s1, alpha) in fade.pieces(t) {
-                    let col = sc.color(grid_colour(col, alpha * line.weight));
-                    sc.under_line(w3(c + across * t + along * s0), w3(c + across * t + along * s1), col, wd);
-                }
-            }
+        let frame = GridFrame { centre: c, u, v, origin, fade };
+        for seg in grid_segments_on(&app.cam, &frame, 300) {
+            // A line two levels share with different kinds blends between the minor and the
+            // major look.
+            let col = grid_blend(grid, grid_major, seg.major);
+            let wd = 0.7 + 0.3 * seg.major;
+            let col = sc.color(grid_colour(col, seg.alpha));
+            sc.under_line(w3(seg.a), w3(seg.b), col, wd);
         }
     }
     // While a dimension's value is typed, the open sketch as that value leaves it. Sampled past
@@ -10103,22 +10098,6 @@ fn grid_blend(minor: [u8; 4], major: [u8; 4], share: f32) -> [u8; 4] {
 
 fn grid_colour(c: [u8; 4], alpha: f32) -> [u8; 4] {
     [c[0], c[1], c[2], (f64::from(c[3]) * f64::from(alpha)).round().clamp(0.0, 255.0) as u8]
-}
-
-/// Where the ground grid is centred: where the view's axis (`back`, through the camera's target
-/// `tf`) meets the plane through the origin with normal `n`, so the middle of the view has grid
-/// (#3087). At a grazing slant, return smoothly toward the point under the target: the actual
-/// intersection runs beyond the visible grid and jumps to the other side at the horizon.
-fn grid_centre(tf: Vec3, back: Vec3, n: Vec3, ext: f64) -> Vec3 {
-    let height = tf.dot(n);
-    let under = tf - n * height;
-    let slant = back.dot(n);
-    // Use the same minimum slant as grid_ext and GridFade. Above it, this is the view-axis
-    // intersection; below it, the offset tends continuously to zero instead of infinity.
-    let reach_slant = slant.abs().max(0.25);
-    let along = (back - n * slant) * (-height * slant / (reach_slant * reach_slant));
-    let len = along.len();
-    if len > ext && len > 0.0 { under + along * (ext / len) } else { under + along }
 }
 
 /// Hover feedback for the active sketch's points and curves (drawn on top of everything).
